@@ -9,7 +9,7 @@ const app = express();
 const PORT = 3000;
 
 // 配置路径
-const STATIC_ROOT = '/data//static-files/';
+const STATIC_ROOT = '/data/static-files/';
 const TMP_DIR = path.join(STATIC_ROOT, 'tmp');
 const FILE_DIR = path.join(STATIC_ROOT, 'h5');
 
@@ -86,7 +86,7 @@ app.get('/', (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>热更新文件上传</title>
+        <title>h5文件上传</title>
         <style>
             body {
                 font-family: Arial, sans-serif;
@@ -178,7 +178,7 @@ app.get('/', (req, res) => {
     </head>
     <body>
         <div class="container">
-            <h1>🔥 热更新文件上传</h1>
+            <h1>🔥 h5文件上传</h1>
             
             <div class="upload-area" id="uploadArea">
                 <p>拖拽h5.zip文件到这里，或点击选择文件</p>
@@ -199,8 +199,7 @@ app.get('/', (req, res) => {
             <div class="status">
                 <h3>当前状态</h3>
                 <p id="statusText">等待文件上传...</p>
-                <p><strong>上传目录:</strong> static.ylssd.com/tmp/</p>
-                <p><strong>热更新目录:</strong> static.ylssd.com/h5/</p>
+                <p><strong>上传目录:</strong> /tmp/</p>
             </div>
         </div>
         
