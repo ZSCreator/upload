@@ -12,7 +12,6 @@ const PORT = 3000;
 const STATIC_ROOT = '/data//static-files/';
 const TMP_DIR = path.join(STATIC_ROOT, 'tmp');
 const FILE_DIR = path.join(STATIC_ROOT, 'h5');
-// const JENKINS_SCRIPT = '/opt/jenkins-scripts/jenkins-update-h5fix.sh';
 
 // 创建必要目录
 if (!fs.existsSync(TMP_DIR)) {
@@ -60,7 +59,7 @@ const upload = multer({
     },
     fileFilter: function (req, file, cb) {
         // 只允许zip文件
-        if (file.mimetype === 'application/zip' || 
+        if (file.mimetype === 'application/zip' ||
             file.mimetype === 'application/x-zip-compressed' ||
             path.extname(file.originalname).toLowerCase() === '.zip') {
             cb(null, true);
@@ -76,26 +75,6 @@ function log(level, message) {
     console.log(`[${timestamp}] [${level}] ${message}`);
 }
 
-// 执行shell脚本
-function executeJenkinsScript(callback) {
-    log('INFO', '开始执行Jenkins热更新脚本');
-    
-    exec(`chmod +x ${JENKINS_SCRIPT} && ${JENKINS_SCRIPT}`, (error, stdout, stderr) => {
-        if (error) {
-            log('ERROR', `脚本执行失败: ${error.message}`);
-            callback(error, null);
-            return;
-        }
-        
-        if (stderr) {
-            log('WARNING', `脚本警告: ${stderr}`);
-        }
-        
-        log('SUCCESS', '脚本执行成功');
-        log('INFO', `脚本输出: ${stdout}`);
-        callback(null, stdout);
-    });
-}
 
 // 路由
 
@@ -363,20 +342,20 @@ app.get('/', (req, res) => {
 // 文件上传接口
 app.post('/upload', upload.single('h5zip'), (req, res) => {
     log('INFO', `收到文件上传请求: ${req.file ? req.file.filename : '无文件'}`);
-    
+
     if (!req.file) {
         log('ERROR', '未收到文件');
-        return res.status(400).json({ 
-            success: false, 
-            message: '未收到文件' 
+        return res.status(400).json({
+            success: false,
+            message: '未收到文件'
         });
     }
-    
+
     const filePath = req.file.path;
     const fileSize = req.file.size;
-    
+
     log('INFO', `文件上传成功: ${filePath}, 大小: ${fileSize} bytes`);
-    
+
     res.json({
         success: true,
         message: `文件上传成功: ${req.file.filename}`,
@@ -386,45 +365,23 @@ app.post('/upload', upload.single('h5zip'), (req, res) => {
     });
 });
 
-// 触发热更新
-app.post('/trigger-update', (req, res) => {
-    log('INFO', '收到热更新触发请求');
-    
-    executeJenkinsScript((error, output) => {
-        if (error) {
-            log('ERROR', `热更新失败: ${error.message}`);
-            res.status(500).json({
-                success: false,
-                message: '热更新执行失败: ' + error.message
-            });
-        } else {
-            log('SUCCESS', '热更新成功');
-            res.json({
-                success: true,
-                message: '热更新执行成功',
-                output: output
-            });
-        }
-    });
-});
-
 // 获取版本信息
 app.get('/api/version', (req, res) => {
     const versionFile = path.join(FILE_DIR, 'version.json');
-    
+
     if (fs.existsSync(versionFile)) {
         try {
             const versionData = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
             res.json(versionData);
         } catch (error) {
             log('ERROR', `读取版本文件失败: ${error.message}`);
-            res.status(500).json({ 
-                error: '读取版本信息失败' 
+            res.status(500).json({
+                error: '读取版本信息失败'
             });
         }
     } else {
-        res.json({ 
-            version: '1.0.0', 
+        res.json({
+            version: '1.0.0',
             update_time: new Date().toISOString(),
             file_count: 0,
             status: 'no_update'
@@ -446,7 +403,7 @@ app.get('/api/files', (req, res) => {
                 isDirectory: stats.isDirectory()
             };
         });
-        
+
         res.json({
             success: true,
             files: fileList
@@ -482,7 +439,7 @@ app.use((error, req, res, next) => {
             });
         }
     }
-    
+
     log('ERROR', `服务器错误: ${error.message}`);
     res.status(500).json({
         success: false,
@@ -496,7 +453,6 @@ app.listen(PORT, () => {
     log('INFO', `访问地址: http://localhost:${PORT}`);
     log('INFO', `上传目录: ${TMP_DIR}`);
     log('INFO', `热更新目录: ${FILE_DIR}`);
-    log('INFO', `Jenkins脚本: ${JENKINS_SCRIPT}`);
 });
 
 // 优雅关闭
