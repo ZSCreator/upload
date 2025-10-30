@@ -364,6 +364,94 @@ app.post('/upload', upload.single('h5zip'), (req, res) => {
     });
 });
 
+// 热更新 - 解压并部署h5.zip
+app.post('/trigger-update', (req, res) => {
+    const zipPath = path.join(TMP_DIR, 'h5.zip');
+
+    if (!fs.existsSync(zipPath)) {
+        log('ERROR', 'h5.zip文件不存在');
+        return res.status(400).json({
+            success: false,
+            message: 'h5.zip文件不存在，请先上传文件'
+        });
+    }
+
+    log('INFO', '开始执行热更新...');
+
+    // 备份现有的h5目录
+    const backupDir = path.join(STATIC_ROOT, `h5_backup_${new Date().toISOString().replace(/[:.]/g, '-')}`);
+    if (fs.existsSync(FILE_DIR) && fs.readdirSync(FILE_DIR).length > 0) {
+        try {
+            fs.renameSync(FILE_DIR, backupDir);
+            log('INFO', `已备份现有h5目录到: ${backupDir}`);
+        } catch (error) {
+            log('ERROR', `备份失败: ${error.message}`);
+        }
+    }
+
+    // 重新创建h5目录
+    if (!fs.existsSync(FILE_DIR)) {
+        fs.mkdirSync(FILE_DIR, { recursive: true });
+    }
+
+    // 解压h5.zip到h5目录
+    const unzipCommand = `unzip -o "${zipPath}" -d "${FILE_DIR}"`;
+    log('INFO', `执行解压命令: ${unzipCommand}`);
+
+    exec(unzipCommand, (error, stdout, stderr) => {
+        if (error) {
+            log('ERROR', `解压失败: ${error.message}`);
+            log('ERROR', `stderr: ${stderr}`);
+
+            // 如果解压失败，恢复备份
+            if (fs.existsSync(backupDir)) {
+                try {
+                    if (fs.existsSync(FILE_DIR)) {
+                        fs.rmSync(FILE_DIR, { recursive: true, force: true });
+                    }
+                    fs.renameSync(backupDir, FILE_DIR);
+                    log('INFO', '已恢复备份');
+                } catch (restoreError) {
+                    log('ERROR', `恢复备份失败: ${restoreError.message}`);
+                }
+            }
+
+            return res.status(500).json({
+                success: false,
+                message: '解压失败: ' + error.message
+            });
+        }
+
+        log('INFO', '解压成功');
+        log('INFO', `stdout: ${stdout}`);
+
+        // 更新版本信息
+        const versionData = {
+            version: new Date().toISOString(),
+            update_time: new Date().toISOString(),
+            file_count: fs.readdirSync(FILE_DIR).length,
+            status: 'updated'
+        };
+
+        try {
+            fs.writeFileSync(
+                path.join(FILE_DIR, 'version.json'),
+                JSON.stringify(versionData, null, 2)
+            );
+            log('INFO', '版本信息已更新');
+        } catch (versionError) {
+            log('ERROR', `写入版本信息失败: ${versionError.message}`);
+        }
+
+        res.json({
+            success: true,
+            message: '热更新执行成功',
+            version: versionData.version,
+            fileCount: versionData.file_count
+        });
+    });
+});
+
 // 获取版本信息
 app.get('/api/version', (req, res) => {
     const versionFile = path.join(FILE_DIR, 'version.json');
