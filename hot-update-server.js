@@ -55,7 +55,7 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 100 * 1024 * 1024 // 100MB限制
+        fileSize: 500 * 1024 * 1024 // 500MB限制
     },
     fileFilter: function (req, file, cb) {
         // 只允许zip文件
@@ -182,6 +182,7 @@ app.get('/', (req, res) => {
             
             <div class="upload-area" id="uploadArea">
                 <p>拖拽h5.zip文件到这里，或点击选择文件</p>
+                <p style="font-size: 14px; color: #666; margin-top: 10px;">支持最大500MB的ZIP文件</p>
                 <input type="file" id="fileInput" accept=".zip" style="display: none;">
                 <button class="btn" onclick="document.getElementById('fileInput').click()">选择文件</button>
             </div>
@@ -246,6 +247,12 @@ app.get('/', (req, res) => {
                     return;
                 }
                 
+                const maxSize = 500 * 1024 * 1024; // 500MB
+                if (file.size > maxSize) {
+                    showMessage('error', \`文件太大！当前: \${(file.size / 1024 / 1024).toFixed(2)} MB，最大限制: 500 MB\`);
+                    return;
+                }
+                
                 selectedFile = file;
                 uploadBtn.disabled = false;
                 statusText.textContent = \`已选择文件: \${file.name} (大小: \${(file.size / 1024 / 1024).toFixed(2)} MB)\`;
@@ -286,15 +293,29 @@ app.get('/', (req, res) => {
                 
                 xhr.addEventListener('load', () => {
                     if (xhr.status === 200) {
-                        const response = JSON.parse(xhr.responseText);
-                        showMessage('success', response.message);
-                        statusText.textContent = '上传成功，正在执行热更新...';
-                        
-                        // 触发热更新
-                        triggerHotUpdate();
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            showMessage('success', response.message);
+                            statusText.textContent = '上传成功，正在执行热更新...';
+                            
+                            // 触发热更新
+                            triggerHotUpdate();
+                        } catch (e) {
+                            showMessage('error', '响应解析失败');
+                            statusText.textContent = '上传失败';
+                            uploadBtn.disabled = false;
+                        }
+                    } else if (xhr.status === 413) {
+                        showMessage('error', '文件太大，超出服务器限制。请压缩文件后重试。');
+                        statusText.textContent = '上传失败：文件过大';
+                        uploadBtn.disabled = false;
                     } else {
-                        const error = JSON.parse(xhr.responseText);
-                        showMessage('error', error.message || '上传失败');
+                        try {
+                            const error = JSON.parse(xhr.responseText);
+                            showMessage('error', error.message || '上传失败');
+                        } catch (e) {
+                            showMessage('error', \`上传失败 (HTTP \${xhr.status})\`);
+                        }
                         statusText.textContent = '上传失败';
                         uploadBtn.disabled = false;
                     }
@@ -520,11 +541,17 @@ app.get('/health', (req, res) => {
 app.use((error, req, res, next) => {
     if (error instanceof multer.MulterError) {
         if (error.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({
+            log('ERROR', '文件大小超出限制');
+            return res.status(413).json({
                 success: false,
-                message: '文件大小超出限制 (最大100MB)'
+                message: '文件大小超出限制 (最大500MB)'
             });
         }
+        log('ERROR', `Multer错误: ${error.message}`);
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
     }
 
     log('ERROR', `服务器错误: ${error.message}`);
